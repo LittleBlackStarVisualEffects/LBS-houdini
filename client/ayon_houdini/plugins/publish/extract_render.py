@@ -18,6 +18,16 @@ class ExtractRender(plugin.HoudiniExtractorPlugin):
                 "usdrender"]
 
     def process(self, instance):
+        # Skip tile render instances - they will be handled by their own extractor
+        if instance.data.get("is_tile_render", False):
+            self.log.debug("Skipping tile render instance. Will be handled by tile extractor.")
+            return
+        
+        # Skip tile assembly instances
+        if instance.data.get("tile_assembly", False):
+            self.log.debug("Skipping tile assembly instance.")
+            return
+        
         creator_attribute = instance.data["creator_attributes"]
 
         do_local_render = (
