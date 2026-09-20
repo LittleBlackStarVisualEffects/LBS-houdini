@@ -75,6 +75,13 @@ class ValidateRenderProductPathsUnique(plugin.HoudiniContextPlugin,
         if not self.is_active(context.data):
             return
 
+        # Skip entire validation if tile rendering is active in this context
+        instances = pyblish.api.instances_by_plugin(list(context), self.__class__)
+        tile_instances = [inst for inst in instances if inst.data.get("is_tile_render", False) or inst.data.get("tile_assembly", False)]
+        if tile_instances:
+            self.log.info(f"Tile rendering active in context - skipping unique paths validation entirely")
+            return
+
         invalid = self.get_invalid(context)
         if not invalid:
             return
@@ -97,6 +104,15 @@ class ValidateRenderProductPathsUnique(plugin.HoudiniContextPlugin,
         if not instances:
             return
 
+        # Filter out tile-related instances entirely - they intentionally share the same ROP
+        tile_instances = [inst for inst in instances if inst.data.get("is_tile_render", False) or inst.data.get("tile_assembly", False)]
+        if tile_instances:
+            cls.log.info(f"Skipping validation for {len(tile_instances)} tile-related instances (render + assembly)")
+        
+        instances = [inst for inst in instances if not (inst.data.get("is_tile_render", False) or inst.data.get("tile_assembly", False))]
+        if not instances:
+            return
+
         # Get expected rendered filepaths
         paths_to_instance_id = defaultdict(list)
         for instance in instances:
@@ -104,6 +120,10 @@ class ValidateRenderProductPathsUnique(plugin.HoudiniContextPlugin,
             # created additional runtime instances per AOV. This avoids
             # validating similar instances multiple times.
             if not instance.data.get("integrate", True):
+                continue
+            
+            # Skip instances marked to skip this check
+            if instance.data.get("skip_render_product_paths_unique_check", False):
                 continue
 
             for filepath in get_instance_expected_files(instance):
